@@ -99,9 +99,40 @@ o_t &= \sigma(r_t) \odot (W_v \cdot \max(k_t, 0)^2)
 \end{align*}
 $$
 
+- interpolation between current and last input 
+- linear receptance $r$ and key $k$
+- only the output gate with non-linearity
 </div>
 
 ::right::
+# Time-Mixing
+
+<br>
+
+$$
+\begin{align*}
+    r_t &= W_r \cdot (\mu_r x_t + (1 - \mu_r) x_{t-1} ) \\
+    k_t &= W_k \cdot (\mu_k x_t + (1 - \mu_k) x_{t-1} ) \\
+    v_t &= W_v \cdot (\mu_v x_t + (1 - \mu_v) x_{t-1} ) \\
+    wkv_t &= \frac{ \sum_{i=1}^{t-1} e^{-(t-1-i)w+k_i} v_i + e^{u+k_t} v_t }{\sum_{i=1}^{t-1} e^{-(t-1-i)w+k_i} + e^{u+k_t}} \\
+    o_t &= W_o \cdot (\sigma(r_t) \odot wkv_t)
+\end{align*}
+$$
+
+- $wkv_t$ analogous to dot production attention
+- RWKV stands for four trainable parameters: 
+**R**eceptance, **W**eight, **K**ey, **V**alue
+
+---
+
+# $wkv$: RNN-Transformer Duality
+
+## Time-parallel mode
+
+
+---
+layout: two-cols
+---
 # Compared to LSTM
 
 <br>
@@ -118,8 +149,16 @@ c_t &= f_t \odot c_{t-1} + i_t \odot \tilde{c}_t\\
 h_t &= o_t \odot \sigma_h(c_t)
 \end{align*}
 $$
-
 </div>
+
+- four gates
+- two hidden states
+- lots of non-linearities
+
+::right::
+# Compared to Transformer
+
+
 
 ---
 
