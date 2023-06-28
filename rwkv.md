@@ -82,6 +82,14 @@ As usual, the architecture is composed by:
 - a main block: time mixing + channel mixing
 - a language modeling head
 
+
+
+<br>
+<br>
+<br>
+
+RWKV stands for four trainable parameters: 
+**R**eceptance, **W**eight, **K**ey, **V**alue
 ---
 layout: two-cols
 ---
@@ -91,7 +99,7 @@ layout: two-cols
 
 <div class='pr-30'>
 
-$$ 
+$$
 \begin{align*}
 r_t &= W_r \cdot (\mu_r x_t + (1-\mu_r)x_{t-1}) \\
 k_t &= W_k \cdot (\mu_k x_t + (1-\mu_k)x_{t-1}) \\
@@ -102,17 +110,29 @@ $$
 - interpolation between current and last input 
 - linear receptance $r$ and key $k$
 - only the output gate with non-linearity
+- $\mu$ hyperparameter 
 </div>
 
 ::right::
+<div v-click>
+
 # Time-Mixing
 
 <br>
+
+<span class="text-gray mb-0 pb-0">
 
 $$
 \begin{align*}
     r_t &= W_r \cdot (\mu_r x_t + (1 - \mu_r) x_{t-1} ) \\
     k_t &= W_k \cdot (\mu_k x_t + (1 - \mu_k) x_{t-1} ) \\
+\end{align*}
+$$
+
+</span>
+
+$$
+\begin{align*}
     v_t &= W_v \cdot (\mu_v x_t + (1 - \mu_v) x_{t-1} ) \\
     wkv_t &= \frac{ \sum_{i=1}^{t-1} e^{-(t-1-i)w+k_i} v_i + e^{u+k_t} v_t }{\sum_{i=1}^{t-1} e^{-(t-1-i)w+k_i} + e^{u+k_t}} \\
     o_t &= W_o \cdot (\sigma(r_t) \odot wkv_t)
@@ -120,51 +140,104 @@ $$
 $$
 
 - $wkv_t$ analogous to dot production attention
-- RWKV stands for four trainable parameters: 
-**R**eceptance, **W**eight, **K**ey, **V**alue
+- $u$ hyperparamter for numerical stability
+</div>
 
 ---
 
-# $wkv$: RNN-Transformer Duality
+# $wkv$: A closer look
 
-## Time-parallel mode
+$wkv$ is the attention-like score inspired by Attention Free Transformer
 
+<div grid="~ cols-2 gap-2" my4>
 
----
-layout: two-cols
----
-# Compared to LSTM
+<div>
 
-<br>
+$$
+wkv_t = \frac{ \sum_{i=1}^{t-1} e^{-(t-1-i)w+k_i} v_i + e^{u+k_t} v_t }{\sum_{i=1}^{t-1} e^{-(t-1-i)w+k_i} + e^{u+k_t}}
+$$
 
-<div class='-ml-30'>
+</div>
+
+<div>
 
 $$
 \begin{align*}
-f_t &= \sigma_g(W_{f} x_t + U_{f} h_{t-1} + b_f) \\
-i_t &= \sigma_g(W_{i} x_t + U_{i} h_{t-1} + b_i) \\
-o_t &= \sigma_g(W_{o} x_t + U_{o} h_{t-1} + b_o) \\
-\tilde{c}_t &= \sigma_c(W_{c} x_t + U_{c} h_{t-1} + b_c) \\
-c_t &= f_t \odot c_{t-1} + i_t \odot \tilde{c}_t\\
-h_t &= o_t \odot \sigma_h(c_t)
+\mathrm{Attn}(Q, K, V)_t &= \frac{\sum_{i=1}^{T} e^{q^{\top}_t k_i}v_i}{\sum_{i=1}^{T} e^{q^{\top}_t k_i}}
 \end{align*}
 $$
+
+</div>
 </div>
 
-- four gates
-- two hidden states
-- lots of non-linearities
+🙂
+- summation over all past timesteps (not need explicit causal mask)
+- weight decay over time (not need explicit positional encoding)
+<!-- - infinite context length -->
+- computationally cheaper (vector product instead of matrix multiplication)
+- still parallelizable (except for time-dimension)
 
-::right::
-# Compared to Transformer
+🙁
+- less expressive (sacrafice dot-product attention and query vector)
+
+---
+
+# $wkv$: Duality
+
+$$
+wkv_t = \frac{ \sum_{i=1}^{t-1} e^{-(t-1-i)w+k_i} v_i + e^{u+k_t} v_t }{\sum_{i=1}^{t-1} e^{-(t-1-i)w+k_i} + e^{u+k_t}}
+$$
+
+We can rewrite it in recurrent form:
+
+$$
+\begin{align*}
+    a_0, b_0 &= 0\\
+    wkv_t &= \frac{a_{t-1} + e^{u + k_t} v_t}{b_{t-1} + e^{u + k_t}} \\
+    a_t &= e^{-w} a_{t-1} + e^{k_t} v_t \\
+    b_t &= e^{-w} b_{t-1} + e^{k_t}
+\end{align*}
+$$
+
+<br>
+
+We call them **time-parallel mode** and **time-sequential mode** respectively.
+
+---
+# Wrap up
+
+<img src="/rwkv/rwkv-block-expand.png"/>
+
+---
+<img src="/rwkv/inference-speed.png"> 
+
+---
+
+<img src="/rwkv/evaluations.png"> 
 
 
 
+---
+
+# Useful resources
+
+<br>
+
+[RWKV paper](https://arxiv.org/abs/2305.13048)
+
+[RWKV repo](https://github.com/BlinkDL/RWKV-LM)
+
+[RWKV in 150 lines](https://github.dev/BlinkDL/ChatRWKV/blob/main/RWKV_in_150_lines.py)
+
+[How the RWKV language model works](https://johanwind.github.io/2023/03/23/rwkv_details.html)
+
+[RWKV paper explained](https://youtu.be/x8pW19wKfXQ)
 ---
 
 # Some other words
 
 <br>
+
 
 Bo Peng was almost an outsider of the game, who is neither a researcher in academic nor in industry.
 
@@ -177,3 +250,11 @@ The model is continuing to upscale with the help of open source community.<sup>*
 </Footnotes>
 
 Bo wishes the RWKV could replace Transformer as the basic architecture in LLM. He also believes AI development should be fully open sourced. He wants RWKV foundation becoming the **Linux** in LLM era.
+
+---
+layout: cover
+class: text-center
+coverDate: null
+---
+
+# Thank you
